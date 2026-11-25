@@ -190,6 +190,7 @@ public final class Touch {
         } catch (Throwable t) {
             System.err.println("[Lamsa] pointer error: " + t);
             t.printStackTrace();
+            cancelAll();
         }
     }
 
@@ -220,6 +221,7 @@ public final class Touch {
         Minecraft m = mc();
         if (d.id().equals("fly")) return m.player != null && m.player.getAbilities().mayfly;
         if (d.id().equals("lock")) return Morph.active();
+        if (d.id().equals("ability")) return Abilities.ready();
         return true;
     }
 
@@ -289,25 +291,25 @@ public final class Touch {
         p.owner = "look";
     }
 
+    /**
+     * العصا: القاعدة ثابتة أين وضعت إصبعك، والفرخ (المقبض) ينزلق داخل حدود الدائرة
+     * ويُقص عند الحافة. لا تتحرك القاعدة مع الإصبع، حتى لا تعلق العصا عند أقصى دفع.
+     */
     static void updateStick(float x, float y) {
-        float r = stickRadius();
+        float r = Math.max(1f, stickRadius());
         float dx = x - stickCx, dy = y - stickCy;
         float dist = (float) Math.hypot(dx, dy);
         if (dist > r) {
-            if (Cfg.I.floatingStick) {
-                // القاعدة تتبع الإصبع ليبقى الإبهام مرتاحاً
-                float k = (dist - r) / dist;
-                stickCx += dx * k;
-                stickCy += dy * k;
-                dx = x - stickCx;
-                dy = y - stickCy;
-            } else {
-                dx = dx / dist * r;
-                dy = dy / dist * r;
-            }
+            dx = dx / dist * r;
+            dy = dy / dist * r;
         }
         knobX = dx / r;
         knobY = dy / r;
+        // لا شيء يمكن أن يبقى معلقاً فوق 1
+        if (Float.isNaN(knobX)) knobX = 0;
+        if (Float.isNaN(knobY)) knobY = 0;
+        knobX = Math.max(-1f, Math.min(1f, knobX));
+        knobY = Math.max(-1f, Math.min(1f, knobY));
     }
 
     static void move(int id, float x, float y) {
@@ -340,7 +342,7 @@ public final class Touch {
         switch (p.owner) {
             case "btn" -> release(p.def);
             case "stick" -> {
-                stickPtr = Integer.MIN_VALUE;
+                if (stickPtr == id) stickPtr = Integer.MIN_VALUE;
                 knobX = knobY = 0;
             }
             case "drag" -> Cfg.save();
@@ -381,7 +383,7 @@ public final class Touch {
             case "tray": return trayOpen;
             case "lock": return Morph.locked;
             case "fly": return mc().player != null && mc().player.getAbilities().flying;
-            default: break;
+            default -> break;
         }
         for (Ptr p : P.values()) if (p.def != null && p.def.id().equals(d.id()) && p.owner.equals("btn")) return true;
         return false;
@@ -406,6 +408,14 @@ public final class Touch {
             case "chat" -> tap(o.keyChat);
             case "drop" -> tap(o.keyDrop);
             case "swap" -> tap(o.keySwapOffhand);
+            case "slot1" -> { if (o.keyHotbarSlots.length > 0) tap(o.keyHotbarSlots[0]); }
+            case "f3" -> { tap(o.keyDebugOverlay); hold(o.keyDebugOverlay, true); }
+            case "f4" -> { tap(o.keyDebugSwitchGameMode); hold(o.keyDebugSwitchGameMode, true); }
+            case "f11" -> {
+                mc().getWindow().toggleFullScreen();
+                o.fullscreen().set(mc().getWindow().isFullscreen());
+            }
+            case "ability" -> Abilities.fire();
             case "persp" -> tap(o.keyTogglePerspective);
             case "pause" -> mc().setScreen(new PauseScreen(true));
             case "tray" -> trayOpen = !trayOpen;
@@ -421,7 +431,10 @@ public final class Touch {
                     pl.onUpdateAbilities();
                 }
             }
-            case "lock" -> Morph.locked = !Morph.locked;
+            case "lock" -> {
+                Morph.locked = !Morph.locked;
+                if (Morph.locked) snapToBlock();
+            }
             default -> {
                 if (d.id().startsWith("c")) {
                     if (isFolder(d)) {
@@ -442,6 +455,8 @@ public final class Touch {
             case "jump" -> hold(o.keyJump, false);
             case "attack" -> hold(o.keyAttack, false);
             case "use" -> hold(o.keyUse, false);
+            case "f3" -> hold(o.keyDebugOverlay, false);
+            case "f4" -> hold(o.keyDebugSwitchGameMode, false);
             case "sneak" -> { if (!Cfg.I.sneakToggle) sneakOn = false; }
             default -> {
                 if (d.id().startsWith("c") && !isFolder(d)) {
@@ -450,6 +465,15 @@ public final class Touch {
                 }
             }
         }
+    }
+
+    /** يجعل اللاعب في مركز البلوكة تماماً (لا يقف على بلوكتين). */
+    public static void snapToBlock() {
+        Minecraft m = mc();
+        if (m.player == null) return;
+        double cx = Math.floor(m.player.getX()) + 0.5;
+        double cz = Math.floor(m.player.getZ()) + 0.5;
+        m.player.setPos(cx, m.player.getY(), cz);
     }
 
     // ───────────────────────── القائمة السريعة ─────────────────────────
@@ -530,6 +554,7 @@ public final class Touch {
             if (p == null) return;
             if (id == screenPrimary) {
                 screenPrimary = Integer.MIN_VALUE;
+                lastScreenX = x; lastScreenY = y;
                 s.mouseReleased(new MouseButtonEvent(x, y, new MouseButtonInfo(btn, mods)));
             }
         }
@@ -576,8 +601,26 @@ public final class Touch {
                 trayOpen = false;
             }
         }
-        if (inScreen) return;
+        if (inScreen) {
+            // لو ضاعت إشارة رفع الإصبع، أفلت النقر حتى لا تعلق القائمة
+            if (screenPrimary != Integer.MIN_VALUE && !P.containsKey(screenPrimary)) {
+                screenPrimary = Integer.MIN_VALUE;
+                try {
+                    m.screen.mouseReleased(new MouseButtonEvent(Math.max(0, lastScreenX), Math.max(0, lastScreenY),
+                        new MouseButtonInfo(Toolbar.right ? 1 : 0, Toolbar.shift ? GLFW.GLFW_MOD_SHIFT : 0)));
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+            }
+            return;
+        }
         if (m.player == null) return;
+
+        // العصا: لو اختفى الإصبع من الجدول لأي سبب، أعدها للصفر
+        if (stickPtr != Integer.MIN_VALUE && !P.containsKey(stickPtr)) {
+            stickPtr = Integer.MIN_VALUE;
+            knobX = knobY = 0;
+        }
 
         // المؤشر حر دائماً أثناء اللعب باللمس
         if (m.mouseHandler.isMouseGrabbed()) m.mouseHandler.releaseMouse();
@@ -593,7 +636,8 @@ public final class Touch {
         hold(o.keyDown, ny > 0.35f);
         hold(o.keyLeft, nx < -0.35f);
         hold(o.keyRight, nx > 0.35f);
-        boolean run = (sprintOn && act && ny < -0.35f) || (Cfg.I.autoSprint && act && ny < -0.9f);
+        // الركض بقرار المستخدم فقط: لا ركض تلقائي عند أقصى دفع (كان يقفل العصا)
+        boolean run = sprintOn && act && ny < -0.35f;
         hold(o.keySprint, run);
         hold(o.keyShift, sneakOn);
 
@@ -607,6 +651,8 @@ public final class Touch {
             }
         }
         if (locked) {
+            // بلوكة حقيقية: تثبت في مركز البلوكة ولا تنزلق بين خليتين
+            snapToBlock();
             var dm = m.player.getDeltaMovement();
             m.player.setDeltaMovement(0, dm.y, 0);
         }
