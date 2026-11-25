@@ -1,2 +1,11 @@
-# lamsa-mod
-Lamsa — Fabric mod for Minecraft 1.21.11 (touch/mobile controls)
+# لمسة (Lamsa Touch) — مود Fabric لماين كرافت جافا 1.21.11
+
+يحوّل اللعبة بالكامل للعب باللمس (مناسب للبث من الكمبيوتر إلى الجوال).
+
+## التثبيت
+1. ثبّت Fabric Loader (0.18 أو أحدث) لإصدار 1.21.11.
+2. ضع `lamsa-1.0.0.jar` و Fabric API (لـ 1.21.11) في مجلد `mods`.
+
+## البناء من المصدر
+يحتاج JDK 25 لتشغيل Gradle (والمود نفسه يعمل على Java 21):
+`./gradlew build` ← الناتج في `build/libs/`.
