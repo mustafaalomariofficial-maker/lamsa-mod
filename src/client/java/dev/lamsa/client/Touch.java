@@ -383,7 +383,7 @@ public final class Touch {
             case "tray": return trayOpen;
             case "lock": return Morph.locked;
             case "fly": return mc().player != null && mc().player.getAbilities().flying;
-            default -> break;
+            default -> { }
         }
         for (Ptr p : P.values()) if (p.def != null && p.def.id().equals(d.id()) && p.owner.equals("btn")) return true;
         return false;
