@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "lamsa",
+  "version": "${version}",
+  "name": "لمسة - Lamsa Touch",
+  "description": "يحوّل ماين كرافت جافا بالكامل للعب باللمس: عصا حركة، أزرار قابلة للتحريك، دعم تعدد الأصابع، قائمة منسدلة لأزرار كل المودات، والتحول إلى أي كائن أو بلوك.",
+  "authors": [
+    "Lamsa"
+  ],
+  "license": "MIT",
+  "icon": "assets/lamsa/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "main": [
+      "dev.lamsa.LamsaMod"
+    ],
+    "client": [
+      "dev.lamsa.client.LamsaClient"
+    ]
+  },
+  "mixins": [
+    {
+      "config": "lamsa.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.18.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
