@@ -38,6 +38,7 @@ public class SettingsScreen extends PanelScreen {
     public SettingsScreen() {
         super("إعدادات لمسة");
         Cfg c = Cfg.I;
+        rows.add(new Info(() -> "لمسة - من صنع ابو بكسل (Abu Pixel)"));
         rows.add(new Info(() -> NativeTouch.status()));
         rows.add(new Step("حجم الأزرار", () -> (int) (c.scale * 100) + "%", () -> { c.scale = clampF(c.scale - 0.1f, 0.6f, 1.8f); Cfg.save(); }, () -> { c.scale = clampF(c.scale + 0.1f, 0.6f, 1.8f); Cfg.save(); }));
         rows.add(new Step("شفافية الأزرار", () -> (int) (c.opacity * 100) + "%", () -> { c.opacity = clampF(c.opacity - 0.1f, 0.2f, 1f); Cfg.save(); }, () -> { c.opacity = clampF(c.opacity + 0.1f, 0.2f, 1f); Cfg.save(); }));
