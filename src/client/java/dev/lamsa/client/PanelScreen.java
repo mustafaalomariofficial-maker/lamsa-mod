@@ -6,18 +6,22 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
 /**
- * قاعدة كل القوائم: لوحة بنمط بيدروك، سحب للتمرير، وضغط مطوّل ثم انزلاق لاختيار
- * أي عنصر (العنصر يكبر قليلاً تحت الإصبع لاختيار دقيق).
+ * قاعدة كل القوائم: لوحة بنمط بيدروك، ضغطة واحدة عادية تختار العنصر مباشرة،
+ * والسحب يمرر القائمة. الضغط المطوّل يفعّل الاختيار الدقيق (العنصر يكبر تحت الإصبع).
  */
 public abstract class PanelScreen extends Screen {
     protected float px, py, pw, ph;
     protected float cx0, cy0, cx1, cy1;
     protected float scroll, maxScroll;
     protected int cols = 1;
-    protected float itemH = 24, gap = 3;
+    protected float itemH = 26, gap = 3;
     protected boolean grid = false;
     protected float cellMin = 42;
     protected final String heading;
+
+    private static final long SELECT_MS = 380;
+    private static final float DRAG_PX = 12f;
+    private static final float TAP_SLOP = 28f;
 
     private int mode; // 0 لا شيء، 1 معلّق، 2 تمرير، 3 اختيار بالانزلاق
     private long pressT;
@@ -101,9 +105,9 @@ public abstract class PanelScreen extends Screen {
 
         drawHeader(g, px + 6, py + 26, pw - 12, mx, my);
 
-        // تحويل الضغط المطوّل إلى وضع الاختيار
+        // الضغط المطوّل = اختيار دقيق بالانزلاق (اختياري، النقر العادي يعمل بدونه)
         long now = System.currentTimeMillis();
-        if (mode == 1 && now - pressT > 260) {
+        if (mode == 1 && now - pressT > SELECT_MS) {
             mode = 3;
             hotItem = pressedItem;
         }
@@ -146,6 +150,8 @@ public abstract class PanelScreen extends Screen {
             Ui.rect(g, tx, by, 5, bh, Ui.LIGHT);
         }
         if (footerH() > 0) drawFooter(g, cx0, cy1 + 3, cx1 - cx0, mode == 3 ? hotItem : -1);
+        // ختم المؤلف
+        Ui.text(g, "لمسة — صنع ابو بكسل (Abu Pixel)", px + pw / 2f, py + ph - 12, Ui.GRAY, 0.7f, true, false);
         Hud.drawToast(g, width, height);
     }
 
@@ -170,8 +176,8 @@ public abstract class PanelScreen extends Screen {
     public boolean mouseDragged(MouseButtonEvent ev, double dx, double dy) {
         curX = ev.x();
         curY = ev.y();
-        if (mode == 1 && Math.hypot(curX - pressX, curY - pressY) > 7) {
-            mode = 2; // سحب سريع = تمرير
+        if (mode == 1 && Math.hypot(curX - pressX, curY - pressY) > DRAG_PX) {
+            mode = 2; // سحب = تمرير
         }
         if (mode == 2) {
             scroll -= dy;
@@ -183,15 +189,29 @@ public abstract class PanelScreen extends Screen {
     @Override
     public boolean mouseReleased(MouseButtonEvent ev) {
         double x = ev.x(), y = ev.y();
+        long held = System.currentTimeMillis() - pressT;
+        double moved = Math.hypot(x - pressX, y - pressY);
         int target = -1;
         if (mode == 1) target = pressedItem;
         else if (mode == 3) target = itemAt(x, y);
+        else if (mode == 2 && held < 450 && moved < TAP_SLOP) target = pressedItem; // ضغطة سريعة فيها رجفة بسيطة
         mode = 0;
         hotItem = -1;
         pressedItem = -1;
         if (target >= 0) activate(target, x, y);
         return true;
     }
+
+    /** إفلات آمن لو ضاعت إشارة رفع الإصبع من نظام اللمس. */
+    public void forceRelease() {
+        int target = pressedItem;
+        mode = 0;
+        hotItem = -1;
+        pressedItem = -1;
+        if (target >= 0 && target < count()) activate(target, pressX, pressY);
+    }
+
+    public boolean holding() { return mode != 0; }
 
     @Override
     public boolean mouseScrolled(double x, double y, double sx, double sy) {
