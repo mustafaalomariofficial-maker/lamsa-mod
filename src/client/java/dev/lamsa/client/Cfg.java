@@ -23,13 +23,16 @@ public final class Cfg {
     public boolean hidden = false;
     public boolean floatingStick = true;
     public boolean nativeTouch = true;
-    public boolean autoSprint = true;
+    /** أُلغي افتراضيًا: كان يقفل العصا عند أقصى دفع ويسبب التصاق الحركة. */
+    public boolean autoSprint = false;
     public boolean sneakToggle = true;
     public boolean keepOpen = false;
     public boolean labels = true;
     public float scale = 1.0f;
     public float opacity = 0.8f;
     public float look = 1.0f;
+    /** تكبير نصوص قوائم المود لتناسب البث على الجوال. */
+    public float uiText = 1.15f;
     /** 0 = لا تغيّر حجم واجهة اللعبة. */
     public int guiScale = 0;
     public int prevGuiScale = -1;
@@ -67,6 +70,7 @@ public final class Cfg {
         }
         if (I.pos == null) I.pos = new LinkedHashMap<>();
         if (I.custom == null) I.custom = new ArrayList<>();
+        if (I.uiText < 1.0f) I.uiText = 1.15f;
     }
 
     public static void save() {
