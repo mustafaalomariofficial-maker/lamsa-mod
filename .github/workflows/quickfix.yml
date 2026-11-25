@@ -1,0 +1,35 @@
+name: quickfix
+on:
+  push:
+    paths:
+      - '.github/workflows/quickfix.yml'
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: pally/lamsa-mobile-overhaul
+          fetch-depth: 0
+      - name: Patch Touch.java
+        run: |
+          python3 - <<'PY'
+          p = 'src/client/java/dev/lamsa/client/Touch.java'
+          s = open(p, encoding='utf-8').read()
+          old = 'default -> { }'
+          n = s.count(old)
+          print('occurrences', n)
+          if n == 1:
+              s = s.replace(old, 'default: break;')
+              open(p, 'w', encoding='utf-8').write(s)
+              print('patched')
+          else:
+              print('no change')
+          PY
+          git config user.name "mustafaalomariofficial-maker"
+          git config user.email "mustafa.alomari.official@gmail.com"
+          git add src/client/java/dev/lamsa/client/Touch.java
+          git diff --cached --quiet || git commit -m "Fix switch case kind in Touch.isPressed"
+          git push origin HEAD:pally/lamsa-mobile-overhaul
